@@ -50,6 +50,7 @@ import type {
   PlayerAction,
   SceneMode,
   TurnActionSlot,
+  TurnResolutionDraft,
 } from './game/types'
 
 const metricLabels: Record<MetricKey, string> = {
@@ -218,8 +219,10 @@ function getGuideCue(
 }
 
 function MetricPill({ metric, value }: { metric: MetricKey; value: number }) {
+  const danger = value <= 22
+  const warning = !danger && value <= 30
   return (
-    <article className="metric-pill">
+    <article className={`metric-pill ${danger ? 'danger' : warning ? 'warning' : ''}`}>
       <span>{metricLabels[metric]}</span>
       <b>{value}</b>
     </article>
@@ -368,6 +371,81 @@ function SettingsDesk({
   )
 }
 
+function ResolutionModal({
+  game,
+  resolution,
+  onConfirm,
+}: {
+  game: GameState
+  resolution: TurnResolutionDraft | null
+  onConfirm: () => void
+}) {
+  const metricLabelsLocal: Record<MetricKey, string> = {
+    treasury: '国库', people: '民心', army: '军心',
+    authority: '皇威', bureaucracy: '吏治', border: '边势', faction: '朋党',
+  }
+
+  const metricChanges = resolution?.metricChanges ?? []
+  const standingChanges = (resolution?.standingChanges ?? []).filter(
+    (c) => (c.favorDelta ?? 0) !== 0 || (c.pressureDelta ?? 0) !== 0,
+  )
+
+  return (
+    <div className="resolution-overlay">
+      <div className="resolution-modal">
+        <header>
+          <ScrollText />
+          <h2>第 {game.turn.number} 回合结算</h2>
+        </header>
+        <p className="resolution-summary">{resolution?.summary ?? '本回合已毕，百官各自散去，只等明日风向。'}</p>
+        {metricChanges.length > 0 && (
+          <section className="resolution-metrics">
+            <h3>国势变化</h3>
+            <div className="resolution-metric-list">
+              {metricChanges.map((change, i) => (
+                <div key={i} className={`resolution-metric-item ${change.delta > 0 ? 'up' : 'down'}`}>
+                  <span>{metricLabelsLocal[change.metric]}</span>
+                  <b>{change.delta > 0 ? `+${change.delta}` : change.delta}</b>
+                  <small>{change.reason}</small>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+        {standingChanges.length > 0 && (
+          <section className="resolution-standing">
+            <h3>人心向背</h3>
+            <div className="resolution-standing-list">
+              {standingChanges.map((change, i) => {
+                const minister = game.ministers.find((m) => m.id === change.ministerId)
+                return (
+                  <div key={i} className="resolution-standing-item">
+                    <b>{minister?.publicDossier.name ?? '某臣'}</b>
+                    {(change.favorDelta ?? 0) !== 0 && (
+                      <span className={(change.favorDelta ?? 0) > 0 ? 'up' : 'down'}>
+                        圣眷 {(change.favorDelta ?? 0) > 0 ? `+${change.favorDelta}` : change.favorDelta}
+                      </span>
+                    )}
+                    {(change.pressureDelta ?? 0) !== 0 && (
+                      <span className={(change.pressureDelta ?? 0) > 0 ? 'pressure-up' : 'pressure-down'}>
+                        畏压 {(change.pressureDelta ?? 0) > 0 ? `+${change.pressureDelta}` : change.pressureDelta}
+                      </span>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </section>
+        )}
+        <button type="button" className="resolution-confirm" onClick={onConfirm}>
+          <Landmark />
+          <span>传下一回合</span>
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function App() {
   const [game, setGame] = useState<GameState>(() => generateNewCourt('first-audience'))
   const [selectedMinisterIds, setSelectedMinisterIds] = useState<string[]>([])
@@ -378,6 +456,7 @@ function App() {
   const [notice, setNotice] = useState('圣驾已至，百官入班。')
   const [source, setSource] = useState<'offline' | 'ai'>('offline')
   const [busy, setBusy] = useState(false)
+  const [pendingResolution, setPendingResolution] = useState<{ draft: TurnResolutionDraft | null } | null>(null)
   const hydrated = useRef(false)
   const currentAgenda = activeAgenda(game)
   const selected = selectedMinisters(game, selectedMinisterIds)
@@ -576,13 +655,11 @@ function App() {
   }
 
   const runNextTurn = async () => {
-    if (busy) {
-      return
-    }
+    if (busy) return
 
     setBusy(true)
     try {
-      let resolution = null
+      let resolution: TurnResolutionDraft | null = null
 
       if (aiReady) {
         try {
@@ -595,14 +672,21 @@ function App() {
         }
       }
 
-      const next = advanceTurn(game, resolution ?? undefined)
-      commitGame(next, `第${next.turn.number}回合开始。${next.turn.lastResolution}`)
-      const firstAgenda = openAgenda(next)
-      setSelectedMinisterIds(firstAgenda?.presenterId ? [firstAgenda.presenterId] : [])
-      setDrawer(null)
+      setPendingResolution({ draft: resolution })
     } finally {
       setBusy(false)
     }
+  }
+
+  const confirmNextTurn = () => {
+    if (!pendingResolution) return
+    const resolution = pendingResolution.draft
+    setPendingResolution(null)
+    const next = advanceTurn(game, resolution ?? undefined)
+    commitGame(next, `第${next.turn.number}回合开始。${next.turn.lastResolution}`)
+    const firstAgenda = openAgenda(next)
+    setSelectedMinisterIds(firstAgenda?.presenterId ? [firstAgenda.presenterId] : [])
+    setDrawer(null)
   }
 
   const drawerTitle = drawer === 'left'
@@ -663,8 +747,24 @@ function App() {
         </div>
       </header>
       <div className="standing-chips">
-        <span>圣眷 {primaryMinister.standing.favor}</span>
-        <span>畏压 {primaryMinister.standing.pressure}</span>
+        <span>
+          圣眷 {primaryMinister.standing.favor}
+          {primaryMinister.previousStanding != null && (() => {
+            const delta = primaryMinister.standing.favor - primaryMinister.previousStanding.favor
+            if (delta > 0) return <em className="trend up"> ↑{delta}</em>
+            if (delta < 0) return <em className="trend down"> ↓{Math.abs(delta)}</em>
+            return <em className="trend flat"> →</em>
+          })()}
+        </span>
+        <span>
+          畏压 {primaryMinister.standing.pressure}
+          {primaryMinister.previousStanding != null && (() => {
+            const delta = primaryMinister.standing.pressure - primaryMinister.previousStanding.pressure
+            if (delta > 0) return <em className="trend up"> ↑{delta}</em>
+            if (delta < 0) return <em className="trend down"> ↓{Math.abs(delta)}</em>
+            return <em className="trend flat"> →</em>
+          })()}
+        </span>
         {primaryMinister.standing.assignment ? <span>领差</span> : null}
         {ministerIsUnderInquiry(game, primaryMinister.id) ? <span>密查</span> : null}
       </div>
@@ -890,6 +990,14 @@ function App() {
             ) : null}
           </div>
         </aside>
+      ) : null}
+
+      {pendingResolution ? (
+        <ResolutionModal
+          game={game}
+          resolution={pendingResolution.draft}
+          onConfirm={confirmNextTurn}
+        />
       ) : null}
     </main>
   )

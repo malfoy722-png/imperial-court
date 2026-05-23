@@ -341,8 +341,55 @@ function makeAgenda(seed: string, rng: () => number, ministers: MinisterProfile[
     })
 }
 
-function makeOpeningCourt(seed: string, ministers: MinisterProfile[], agenda: AgendaItem[]): CourtState {
+function proactiveLines(seed: string, ministers: MinisterProfile[], lineBase: number): CourtLine[] {
+  const lines: CourtLine[] = []
+
+  for (const m of ministers) {
+    if (lines.length >= 2) break
+
+    // 领了差的大臣主动汇报进度
+    if (m.standing.assignment) {
+      const reports = [
+        `臣领的《${m.standing.assignment}》差事，眼下已走了大半，有几处细节还需请旨。`,
+        `臣奉旨承办《${m.standing.assignment}》，进展尚顺，但各衙门配合的速度，臣不敢替他们打保票。`,
+        `《${m.standing.assignment}》一事臣正在督办，今日上朝前臣已把账理了一遍，随时可以回陛下。`,
+      ]
+      lines.push(line(
+        `${seed}-proactive-${m.id}`,
+        m.id,
+        m.publicDossier.name,
+        reports[lines.length % reports.length],
+        '主动奏报',
+      ))
+      continue
+    }
+
+    // 高圣眷大臣主动背书表忠
+    if (m.standing.favor >= 68 && lines.length === 0) {
+      const endorsements = [
+        `臣昨日与几位同僚谈起陛下上回的旨意，众人皆言圣断高明，臣不过是借了陛下的光把事办了。`,
+        `陛下上回点拨的几句话，臣回去想了一夜，越想越觉得是臣自己看浅了。`,
+      ]
+      lines.push(line(
+        `${seed}-proactive-favor-${m.id}`,
+        m.id,
+        m.publicDossier.name,
+        endorsements[m.standing.favor % endorsements.length],
+        '表忠',
+      ))
+    }
+  }
+
+  return lines.map((l, i) => ({ ...l, id: `${seed}-proactive-${lineBase + i}` }))
+}
+
+function makeOpeningCourt(seed: string, ministers: MinisterProfile[], agenda: AgendaItem[], turnNumber = 1): CourtState {
   const presenter = ministers.find((minister) => minister.id === agenda[0].presenterId)
+  const baseLine0 = createId(seed, 'line', 0)
+  const baseLine1 = createId(seed, 'line', 1)
+
+  // 第一回合不加主动汇报，避免开局冷场
+  const proactive = turnNumber > 1 ? proactiveLines(seed, ministers, 2) : []
 
   return {
     agenda,
@@ -359,14 +406,15 @@ function makeOpeningCourt(seed: string, ministers: MinisterProfile[], agenda: Ag
     ],
     transcript: [
       line(
-        createId(seed, 'line', 0),
+        baseLine0,
         null,
         '鸿胪寺',
         `钟鼓已毕，百官分班。依今朝奏事次第，请${presenter?.publicDossier.office ?? '值殿官'}${presenter?.publicDossier.name ?? ''}出班，先奏《${agenda[0].title}》。`,
         '引奏',
       ),
+      ...proactive,
       line(
-        createId(seed, 'line', 1),
+        baseLine1,
         presenter?.id ?? null,
         presenter?.publicDossier.name ?? '值殿官',
         agendaPresentationText(agenda[0]),
@@ -1469,17 +1517,17 @@ export function advanceTurn(game: GameState, draft?: TurnResolutionDraft): GameS
     return [...forced, ...freshAgenda].slice(0, 3)
   })()
 
-  // 留中的大臣在记忆里记下这件事
-  const ministersWithHeldMemory = heldItems.length > 0
-    ? settled.ministers.map((m) => {
-        const wasPresenter = heldItems.some((a) => a.presenterId === m.id)
-        if (!wasPresenter) return m
-        return {
-          ...m,
-          memory: [...m.memory, `奏疏《${heldItems.find((a) => a.presenterId === m.id)?.title}》被皇帝留中，悬而未决。`].slice(-8),
-        }
-      })
-    : settled.ministers
+  // 留中的大臣在记忆里记下这件事，同时快照本回合 standing 供趋势展示
+  const ministersWithHeldMemory = settled.ministers.map((m) => {
+    const wasPresenter = heldItems.some((a) => a.presenterId === m.id)
+    return {
+      ...m,
+      previousStanding: { favor: m.standing.favor, pressure: m.standing.pressure },
+      memory: wasPresenter
+        ? [...m.memory, `奏疏《${heldItems.find((a) => a.presenterId === m.id)?.title}》被皇帝留中，悬而未决。`].slice(-8)
+        : m.memory,
+    }
+  })
 
   const day = settled.calendar.day === 28 ? 1 : settled.calendar.day + 1
   const month = settled.calendar.day === 28 ? (settled.calendar.month % 12) + 1 : settled.calendar.month
@@ -1512,7 +1560,7 @@ export function advanceTurn(game: GameState, draft?: TurnResolutionDraft): GameS
       pendingEvents: draft?.newPendingEvents ?? [`上一回合：${summaryText}`],
       lastResolution: summaryText,
     },
-    currentCourt: makeOpeningCourt(seed, ministersWithHeldMemory, agenda),
+    currentCourt: makeOpeningCourt(seed, ministersWithHeldMemory, agenda, settled.turn.number + 1),
     summaries: [summary, ...settled.summaries].slice(0, 12),
     updatedAt: now(),
   }

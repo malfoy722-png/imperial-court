@@ -110,6 +110,7 @@ export interface MinisterProfile {
   publicDossier: PublicDossier
   persona: MinisterPersona
   standing: ImperialStanding
+  previousStanding?: Pick<ImperialStanding, 'favor' | 'pressure'>
   hiddenTraits: HiddenTraits
   revealedFacts: RevealedFact[]
   memory: string[]

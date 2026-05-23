@@ -1128,12 +1128,39 @@ export function applyStatePatch(game: GameState, action: PlayerAction, rawPatch:
     }
   })
 
+  // 处理 tentativeDecision（存储意图待确认）
+  const tentativeDecision = patch.tentativeDecision !== undefined
+    ? patch.tentativeDecision
+    : game.currentCourt.tentativeDecision
+
+  // 处理 agendaDecision（皇帝确认后真正结算议题）
+  let agendaResult = game.currentCourt.agenda
+  let activeAgendaId = game.currentCourt.activeAgendaId
+  if (patch.agendaDecision) {
+    const { agendaId, actionType } = patch.agendaDecision
+    const fakeAction: PlayerAction = {
+      type: actionType,
+      text: '',
+      agendaId,
+      targetMinisterId: patch.agendaDecision.ministerId,
+    }
+    agendaResult = setAgendaStatus(agendaResult, fakeAction)
+    const next = nextOpenAgenda(agendaResult, agendaId)
+    if (next) activeAgendaId = next.id
+  }
+
   return {
     ...game,
     metrics,
     ministers,
     edicts: [...game.edicts, ...edicts],
     investigations: [...game.investigations, ...investigations],
+    currentCourt: {
+      ...game.currentCourt,
+      agenda: agendaResult,
+      activeAgendaId,
+      tentativeDecision: patch.agendaDecision ? null : tentativeDecision,
+    },
     updatedAt: now(),
   }
 }

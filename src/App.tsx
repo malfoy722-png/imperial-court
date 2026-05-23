@@ -1,6 +1,5 @@
 import {
   BookOpenText,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Crown,
@@ -8,15 +7,12 @@ import {
   Landmark,
   MessageSquareText,
   ScrollText,
-  Search,
   SendHorizontal,
   Settings2,
   ShieldCheck,
   Sparkles,
-  Stamp,
   Swords,
   UsersRound,
-  XCircle,
   Zap,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
@@ -78,18 +74,6 @@ const slotLabels: Record<TurnActionSlot, string> = {
   briefing: '整理',
 }
 
-const contextActions: Array<{
-  type: CourtActionType
-  label: string
-  icon: typeof SendHorizontal
-}> = [
-  { type: 'approve', label: '准奏', icon: ShieldCheck },
-  { type: 'reject', label: '驳回', icon: XCircle },
-  { type: 'hold', label: '留中', icon: ScrollText },
-  { type: 'assign', label: '交办', icon: Stamp },
-  { type: 'reconsider', label: '复议', icon: ScrollText },
-  { type: 'appoint', label: '任命', icon: Crown },
-]
 
 const privateAudienceActions: Array<{
   type: CourtActionType
@@ -110,8 +94,6 @@ type MinisterStageSlot = {
   side: 'left' | 'right'
   z: number
 }
-
-type GuideTone = 'opening' | 'agenda' | 'selection' | 'actionDone' | 'busy'
 
 const ministerPositions = [
   { x: 39, y: 17, scale: 1.04, rank: 'front', side: 'left', z: 7 },
@@ -164,9 +146,6 @@ function ministerIsUnderInquiry(game: GameState, ministerId: string) {
   return game.investigations.some((item) => item.ministerId === ministerId)
 }
 
-function allTurnActionsUsed(game: GameState) {
-  return Object.values(game.turn.usedActions).every(Boolean)
-}
 
 function openAgenda(game: GameState) {
   return game.currentCourt.agenda.find((agenda) => agenda.status === 'open')
@@ -180,43 +159,6 @@ const withAiTimeout = async <T,>(task: Promise<T>, milliseconds: number, label: 
     }),
   ])
 
-function getGuideCue(
-  game: GameState,
-  selectedIds: string[],
-  busy: boolean,
-  agenda: AgendaItem | undefined,
-): { tone: GuideTone; text: string } {
-  if (busy) {
-    return { tone: 'busy', text: '皇上，臣等正在回奏，您稍候片刻。' }
-  }
-
-  if (allTurnActionsUsed(game)) {
-    return { tone: 'actionDone', text: '皇上，本回合差不多齐了，可以传下一回合了。' }
-  }
-
-  const selected = selectedMinisters(game, selectedIds)
-
-  if (selected[0]) {
-    return { tone: 'selection', text: `皇上，您正问着${selected[0].publicDossier.name}。` }
-  }
-
-  if (!agenda) {
-    return { tone: 'agenda', text: '皇上，您想先议哪一件事？' }
-  }
-
-  const presenter = game.ministers.find((minister) => minister.id === agenda.presenterId)
-
-  if (game.turn.number === 1 && game.currentCourt.transcript.length <= 2) {
-    return { tone: 'opening', text: '皇上，咱该上朝了。先看今日奏目。' }
-  }
-
-  return {
-    tone: 'agenda',
-    text: presenter
-      ? `皇上，要不要先点${presenter.publicDossier.name}出班？`
-      : '皇上，您想召见谁来问话？',
-  }
-}
 
 function MetricPill({ metric, value }: { metric: MetricKey; value: number }) {
   const danger = value <= 22
@@ -312,12 +254,44 @@ function MinisterFigure({
   )
 }
 
-function CourtGuide({ tone, text }: { tone: GuideTone; text: string }) {
+function TranscriptBubble({
+  entry,
+  ministerIndex,
+  isEmperor,
+  onClick,
+}: {
+  entry: import('./game/types').CourtLine
+  ministerIndex: number
+  isEmperor: boolean
+  onClick: () => void
+}) {
+  const portraitX = `${(ministerIndex % 3) * 50}%`
+  const portraitY = `${Math.floor(ministerIndex / 3) * 50}%`
+
   return (
-    <aside className={`court-guide ${tone}`} aria-label="随侍引导">
-      <span className="guide-portrait" aria-hidden="true" />
-      <p>{text}</p>
-    </aside>
+    <div
+      className={`transcript-bubble ${isEmperor ? 'emperor' : 'minister'}`}
+      onClick={onClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => e.key === 'Enter' && onClick()}
+    >
+      {!isEmperor && (
+        <span
+          className="bubble-portrait"
+          style={{
+            '--portrait-x': portraitX,
+            '--portrait-y': portraitY,
+          } as React.CSSProperties}
+          aria-hidden="true"
+        />
+      )}
+      <div className="bubble-body">
+        <b className="bubble-name">{entry.speakerName}</b>
+        <p className="bubble-text">{entry.text}</p>
+      </div>
+      {isEmperor && <span className="bubble-emperor-mark" aria-hidden="true" />}
+    </div>
   )
 }
 
@@ -458,17 +432,21 @@ function App() {
   const [busy, setBusy] = useState(false)
   const [pendingResolution, setPendingResolution] = useState<{ draft: TurnResolutionDraft | null } | null>(null)
   const hydrated = useRef(false)
+  const scrollRef = useRef<HTMLDivElement>(null)
   const currentAgenda = activeAgenda(game)
   const selected = selectedMinisters(game, selectedMinisterIds)
   const primaryMinister = selected[0] ?? null
   const aiReady = Boolean(settings.aiEnabled && settings.apiKey && window.courtDesktop)
-  const latestLines = game.currentCourt.transcript.slice(-8)
   const effects = game.currentCourt.imperialEffects.slice(0, 4)
-  const guideCue = getGuideCue(game, selectedMinisterIds, busy, currentAgenda)
   const sceneSlot = slotForScene(game.phase)
   const currentAgendaOpen = currentAgenda?.status === 'open'
   const sceneActionLocked = game.phase !== 'court' && game.turn.usedActions[sceneSlot]
   const composerDisabled = busy || sceneActionLocked || (game.phase === 'court' && !currentAgendaOpen)
+
+  useEffect(() => {
+    const el = scrollRef.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [game.currentCourt.transcript.length, busy])
 
   useEffect(() => {
     Promise.all([loadLatestGame(), loadMiniMaxSettings()]).then(([savedGame, savedSettings]) => {
@@ -511,9 +489,6 @@ function App() {
   const changeScene = (scene: SceneMode) => {
     setGame((current) => setSceneMode(current, scene))
     setNotice(`${sceneLabels[scene]}已摆开。`)
-    if (scene === 'privateAudience' || scene === 'court') {
-      setDrawer('bottom')
-    }
   }
 
   const selectMinister = (ministerId: string, additive: boolean) => {
@@ -794,98 +769,7 @@ function App() {
     </section>
   )
 
-  const bottomDrawer = (
-    <>
-      <section className="dialogue-strip">
-        {latestLines.map((entry) => (
-          <article
-            key={entry.id}
-            className={entry.speakerName === '朕' ? 'emperor' : ''}
-            onClick={() => {
-              const target = speakerTargetFromLine(game, entry.speakerId)
-              if (target) {
-                setSelectedMinisterIds([target.id])
-                setDrawer('right')
-              } else {
-                setSelectedMinisterIds([])
-                setDrawer('left')
-              }
-            }}
-          >
-            <b>{entry.speakerName}</b>
-            <p>{entry.text}</p>
-          </article>
-        ))}
-      </section>
-      <form
-        className="composer"
-        onSubmit={(event) => {
-          event.preventDefault()
-          runAction('speak')
-        }}
-      >
-        <textarea
-          value={composer}
-          onChange={(event) => setComposer(event.target.value)}
-          placeholder={primaryMinister
-            ? `对${primaryMinister.publicDossier.name}开口。`
-            : game.phase === 'privateAudience'
-              ? '御书房里先点一名臣子。'
-              : '对满朝说话，或点臣子单独问。'}
-          disabled={composerDisabled}
-        />
-        <button type="submit" disabled={composerDisabled}>
-          <SendHorizontal />
-          <span>开口</span>
-        </button>
-      </form>
-      {game.phase === 'privateAudience' ? (
-        <nav className="context-actions private-actions">
-          {privateAudienceActions.map((action) => {
-            const Icon = action.icon
-            return (
-              <button
-                key={action.type}
-                type="button"
-                onClick={() => runAction(action.type)}
-                disabled={busy || !primaryMinister || game.turn.usedActions.private}
-                title={action.description}
-              >
-                <Icon />
-                <span>{action.label}</span>
-              </button>
-            )
-          })}
-          <button type="button" onClick={() => runAction('investigate')} disabled={busy || !primaryMinister || game.turn.usedActions.intel}>
-            <Search />
-            <span>密查</span>
-          </button>
-        </nav>
-      ) : (
-        <nav className="context-actions">
-          {contextActions.map((action) => {
-            const Icon = action.icon
-            return (
-              <button
-                key={action.type}
-                type="button"
-                onClick={() => runAction(action.type)}
-                disabled={busy || sceneActionLocked || !currentAgendaOpen}
-                title={currentAgenda ? `${action.label}：${currentAgenda.title}` : action.label}
-              >
-                <Icon />
-                <span>{action.label}</span>
-              </button>
-            )
-          })}
-          <button type="button" onClick={() => runAction('investigate')} disabled={busy || !primaryMinister || game.turn.usedActions.intel}>
-            <Search />
-            <span>密查</span>
-          </button>
-        </nav>
-      )}
-    </>
-  )
+  const bottomDrawer = null
 
   return (
     <main className={`court-app-v2 scene-${game.phase} drawer-${drawer ?? 'closed'}`}>
@@ -914,11 +798,7 @@ function App() {
 
       <section className="throne-stage" aria-label="御座视角朝堂">
         <div className="hall-wash" />
-        <div className="scene-note">
-          <b>{sceneLabels[game.phase]}</b>
-          <span>{notice}</span>
-        </div>
-        <div className="minister-field">
+        <div className="minister-field minister-field--bg">
           {game.ministers.map((minister, index) => (
             <MinisterFigure
               key={minister.id}
@@ -932,7 +812,86 @@ function App() {
             />
           ))}
         </div>
-        <CourtGuide tone={guideCue.tone} text={guideCue.text} />
+
+        <div className="court-scroll-wrap">
+          <div className="court-scroll-header">
+            <b>{sceneLabels[game.phase]}</b>
+            <span>{notice}</span>
+            {game.currentCourt.tentativeDecision && (
+              <span className="tentative-hint">⬤ 等待确认：{game.currentCourt.tentativeDecision.confirmText}</span>
+            )}
+          </div>
+
+          <div className="court-scroll" ref={scrollRef}>
+            {game.currentCourt.transcript.map((entry) => {
+              const isEmperor = entry.speakerName === '朕'
+              const mIdx = game.ministers.findIndex((m) => m.id === entry.speakerId)
+              return (
+                <TranscriptBubble
+                  key={entry.id}
+                  entry={entry}
+                  ministerIndex={mIdx >= 0 ? mIdx : 0}
+                  isEmperor={isEmperor}
+                  onClick={() => {
+                    const target = speakerTargetFromLine(game, entry.speakerId)
+                    if (target) {
+                      selectMinister(target.id, false)
+                      setDrawer('right')
+                    }
+                  }}
+                />
+              )
+            })}
+            {busy && <div className="scroll-typing"><span /><span /><span /></div>}
+          </div>
+
+          <div className="court-input-bar">
+            {game.phase === 'privateAudience' && (
+              <nav className="private-quick-actions">
+                {privateAudienceActions.map((act) => {
+                  const Icon = act.icon
+                  return (
+                    <button
+                      key={act.type}
+                      type="button"
+                      onClick={() => runAction(act.type)}
+                      disabled={busy || !primaryMinister || game.turn.usedActions.private}
+                      title={act.description}
+                    >
+                      <Icon /><span>{act.label}</span>
+                    </button>
+                  )
+                })}
+              </nav>
+            )}
+            <form
+              className="composer"
+              onSubmit={(e) => { e.preventDefault(); runAction('speak') }}
+            >
+              <textarea
+                value={composer}
+                onChange={(e) => setComposer(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault()
+                    runAction('speak')
+                  }
+                }}
+                placeholder={primaryMinister
+                  ? `对${primaryMinister.publicDossier.name}开口（Enter 发送）`
+                  : game.phase === 'privateAudience'
+                    ? '御书房里先点一名臣子'
+                    : '对满朝说话，或点臣子单独问（Enter 发送）'}
+                disabled={composerDisabled}
+                rows={2}
+              />
+              <button type="submit" disabled={composerDisabled}>
+                <SendHorizontal />
+              </button>
+            </form>
+          </div>
+        </div>
+
         <div className="throne-desk" aria-hidden="true">
           <div className="desk-props" />
           <div className="desk-effects">
@@ -969,10 +928,6 @@ function App() {
       <button type="button" className="drawer-tab right" onClick={() => setDrawer(drawer === 'right' ? null : 'right')}>
         <ChevronLeft />
         <span>人事</span>
-      </button>
-      <button type="button" className="drawer-tab bottom" onClick={() => setDrawer(drawer === 'bottom' ? null : 'bottom')}>
-        <ChevronDown />
-        <span>对话</span>
       </button>
 
       {drawer ? (

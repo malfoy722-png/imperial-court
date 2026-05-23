@@ -45,6 +45,19 @@ export const aiAgendaSchema = z.object({
   agenda: z.array(agendaDraftSchema).length(3),
 })
 
+const tentativeDecisionSchema = z.object({
+  agendaId: z.string(),
+  actionType: z.enum(courtActionTypes),
+  ministerId: z.string().optional(),
+  confirmText: z.string().min(1).max(120),
+}).nullable()
+
+const agendaDecisionSchema = z.object({
+  agendaId: z.string(),
+  actionType: z.enum(courtActionTypes),
+  ministerId: z.string().optional(),
+}).nullable()
+
 export const statePatchSchema = z.object({
   metricChanges: z
     .array(
@@ -91,6 +104,8 @@ export const statePatchSchema = z.object({
       }),
     )
     .default([]),
+  tentativeDecision: tentativeDecisionSchema.optional(),
+  agendaDecision: agendaDecisionSchema.optional(),
 })
 
 export const aiBeatSchema = z.object({

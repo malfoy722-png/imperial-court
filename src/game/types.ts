@@ -139,6 +139,13 @@ export interface CourtLine {
   effects?: ImperialEffect[]
 }
 
+export interface TentativeDecision {
+  agendaId: string
+  actionType: CourtActionType
+  ministerId?: string
+  confirmText: string
+}
+
 export interface CourtState {
   agenda: AgendaItem[]
   activeAgendaId: string
@@ -147,6 +154,7 @@ export interface CourtState {
   focusMinisterId: string | null
   atmosphere: string
   imperialEffects: ImperialEffect[]
+  tentativeDecision?: TentativeDecision | null
 }
 
 export interface PlayerAction {
@@ -210,12 +218,20 @@ export interface ImperialEffect {
   ministerId?: string
 }
 
+export interface AgendaDecision {
+  agendaId: string
+  actionType: CourtActionType
+  ministerId?: string
+}
+
 export interface StatePatch {
   metricChanges: MetricChange[]
   edicts: EdictDraft[]
   investigations: InvestigationResult[]
   memories: MinisterMemory[]
   standingChanges: MinisterStandingChange[]
+  tentativeDecision?: TentativeDecision | null
+  agendaDecision?: AgendaDecision | null
 }
 
 export interface EdictRecord extends EdictDraft {

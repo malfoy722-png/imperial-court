@@ -365,7 +365,7 @@ async function askAudienceAgenda(gameState, settings) {
     '你是架空朝堂沙盒游戏的 Court Director，替下一场常朝备好三件待奏之事。',
     '事件要随机、有日常、有实务，危机最多一件。不要复述刚处理完的事。',
     '每件事必须一眼看懂：title 是直白问题，summary 说谁报什么冲突，briefing 交代背景，decision 说皇帝要裁断什么。',
-    'presenterId 只能从给出的九名核心官员 id 中选，按其官职挑最可能出班的人。',
+    'presenterId 只能从给出的十二名核心官员 id 中选，按其官职挑最可能出班的人。',
     '只返回 JSON，不要 Markdown，不要思考过程。',
     'JSON 形状：{"agenda":[{"title":string,"summary":string,"briefing":string,"decision":string,"severity":"daily"|"state"|"crisis","presenterId":string}]}',
     `朝廷状态：${JSON.stringify(summarizeCourtForAgenda(gameState))}`,

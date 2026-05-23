@@ -139,6 +139,7 @@ export const aiResolutionSchema = z.object({
 const decisionActions = new Set<PlayerAction['type']>([
   'approve',
   'reject',
+  'hold',
   'assign',
   'reconsider',
   'appoint',

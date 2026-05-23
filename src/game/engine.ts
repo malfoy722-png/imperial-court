@@ -32,6 +32,9 @@ const offices = [
   ['首辅', '内阁票拟'],
   ['都察院左都御史', '言路风纪'],
   ['锦衣卫指挥使', '缉访密查'],
+  ['大理寺卿', '复核刑狱'],
+  ['通政使', '章奏通达'],
+  ['太常寺卿', '礼乐祭祀'],
 ] as const
 
 const fullNames = [
@@ -89,7 +92,20 @@ const openings = [
   '边报平静得可疑，京城倒先被一批奇怪贡品搅热闹了。',
   '新科放榜在即，朝廷人人都说公道，人人都想先看名单。',
 ]
-const accentColors = ['#d86e45', '#2d8f8d', '#d7a542', '#718bd4', '#9a5cb4', '#6e9e56', '#b65757', '#4f9b72', '#9368b8']
+const accentColors = [
+  '#d86e45',
+  '#2d8f8d',
+  '#d7a542',
+  '#718bd4',
+  '#9a5cb4',
+  '#6e9e56',
+  '#b65757',
+  '#4f9b72',
+  '#9368b8',
+  '#c08242',
+  '#4f8fa8',
+  '#a95f68',
+]
 
 const agendaTemplates = [
   {
@@ -946,7 +962,7 @@ function defaultTurn(number = 1) {
       private: false,
       briefing: false,
     },
-    pendingEvents: ['新朝初开，九卿彼此都在试探龙椅脾气。'],
+    pendingEvents: ['新朝初开，十二重臣彼此都在试探龙椅脾气。'],
     lastResolution: '尚无回合结算。',
   }
 }
@@ -1020,6 +1036,90 @@ function preparePatchForAction(game: GameState, action: PlayerAction, rawPatch: 
   return constrainPatchForAction(action, addDefaultStandingChange(game, action, rawPatch))
 }
 
+function patchWithDecisionDefaults(game: GameState, action: PlayerAction, patch: StatePatch) {
+  if (!isAgendaDecision(action)) {
+    return patch
+  }
+
+  const agenda = game.currentCourt.agenda.find(
+    (item) => item.id === (action.agendaId ?? game.currentCourt.activeAgendaId),
+  )
+  const speaker = speakerForAction(game, action)
+  const subject = agenda?.title ?? '眼前这桩差事'
+  const nextPatch = {
+    ...patch,
+    metricChanges: [...patch.metricChanges],
+    edicts: [...patch.edicts],
+    memories: [...patch.memories],
+  }
+
+  if (nextPatch.edicts.length === 0) {
+    if (action.type === 'approve') {
+      nextPatch.edicts.push({
+        title: `准办：${subject}`,
+        summary: action.text || `按朝议推进《${subject}》，由${speaker.publicDossier.office}先承办。`,
+      })
+    } else if (action.type === 'reject') {
+      nextPatch.edicts.push({
+        title: `驳回：${subject}`,
+        summary: action.text || `原议不准，责成相关衙门另拟《${subject}》。`,
+      })
+    } else if (action.type === 'assign') {
+      nextPatch.edicts.push({
+        title: `转办：${subject}`,
+        summary: action.text || `将《${subject}》交${speaker.publicDossier.office}牵头。`,
+      })
+    } else if (action.type === 'reconsider') {
+      nextPatch.edicts.push({
+        title: `复议：${subject}`,
+        summary: action.text || `相关官员重议《${subject}》，择日再奏。`,
+      })
+    } else if (action.type === 'appoint') {
+      nextPatch.edicts.push({
+        title: `任命试差：${speaker.publicDossier.name}`,
+        summary: action.text || `令${speaker.publicDossier.name}暂领《${subject}》相关差事。`,
+      })
+    }
+  }
+
+  if (nextPatch.metricChanges.length === 0) {
+    if (action.type === 'approve') {
+      nextPatch.metricChanges.push({
+        metric: agenda?.severity === 'crisis' ? 'border' : 'bureaucracy',
+        delta: metricDeltaForAgenda(agenda?.severity ?? 'daily'),
+        reason: `《${subject}》得了明确去处。`,
+      })
+    } else if (action.type === 'reject') {
+      nextPatch.metricChanges.push({
+        metric: 'authority',
+        delta: 2,
+        reason: '圣断干脆，朝臣知晓糊弄不过去。',
+      })
+    } else if (action.type === 'assign') {
+      nextPatch.metricChanges.push({
+        metric: 'bureaucracy',
+        delta: 3,
+        reason: '差事有了牵头人。',
+      })
+    } else if (action.type === 'appoint') {
+      nextPatch.metricChanges.push({
+        metric: 'authority',
+        delta: 3,
+        reason: '用人权当殿落下。',
+      })
+    }
+  }
+
+  if (nextPatch.memories.length === 0 && ['approve', 'reject', 'assign', 'appoint'].includes(action.type)) {
+    nextPatch.memories.push({
+      ministerId: speaker.id,
+      note: `在《${subject}》上领到皇帝明断：${action.type === 'reject' ? '原议被驳' : '差事有了归处'}。`,
+    })
+  }
+
+  return nextPatch
+}
+
 function imperialEffectsFromPatch(game: GameState, patch: StatePatch, action: PlayerAction, lineBase: number) {
   const effects: ImperialEffect[] = []
 
@@ -1084,8 +1184,7 @@ function imperialEffectsFromPatch(game: GameState, patch: StatePatch, action: Pl
   return effects.slice(0, 4)
 }
 
-export function applyStatePatch(game: GameState, action: PlayerAction, rawPatch: StatePatch, clues: CourtClue[]): GameState {
-  const patch = preparePatchForAction(game, action, rawPatch)
+export function applyStatePatch(game: GameState, patch: StatePatch, clues: CourtClue[]): GameState {
   const issuedAt = dateLabel(game)
   const edicts: EdictRecord[] = patch.edicts.map((edict, index) => ({
     ...edict,
@@ -1181,10 +1280,13 @@ export function recordCourtBeats(
         targetMinisterId: patch.agendaDecision.ministerId,
       }
     : action
-  const effectivePatch = preparePatchForAction(game, agendaAction, patch)
+  const effectivePatch = patchWithDecisionDefaults(
+    game,
+    agendaAction,
+    preparePatchForAction(game, agendaAction, patch),
+  )
   const next = applyStatePatch(
     game,
-    action,
     effectivePatch,
     settledBeats.flatMap((beat) => beat.clues),
   )

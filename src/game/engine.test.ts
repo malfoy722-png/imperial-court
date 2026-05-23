@@ -33,12 +33,12 @@ describe('court generation', () => {
     expect(publicText).not.toContain('loyalty')
   })
 
-  it('creates a fixed nine-minister roster with unique names', () => {
-    const game = generateNewCourt('nine-cabinet')
+  it('creates a fixed twelve-minister roster with unique names', () => {
+    const game = generateNewCourt('twelve-cabinet')
     const offices = game.ministers.map((minister) => minister.publicDossier.office)
     const names = game.ministers.map((minister) => minister.publicDossier.name)
 
-    expect(game.ministers).toHaveLength(9)
+    expect(game.ministers).toHaveLength(12)
     expect(new Set(names).size).toBe(names.length)
     expect(offices).toEqual([
       '吏部尚书',
@@ -50,6 +50,9 @@ describe('court generation', () => {
       '首辅',
       '都察院左都御史',
       '锦衣卫指挥使',
+      '大理寺卿',
+      '通政使',
+      '太常寺卿',
     ])
   })
 })
@@ -165,6 +168,46 @@ describe('court state safety', () => {
     expect(asked.currentCourt.agenda.find((agenda) => agenda.id === agendaId)?.status).toBe('open')
     expect(decided.currentCourt.agenda.find((agenda) => agenda.id === agendaId)?.status).toBe('resolved')
     expect(decided.currentCourt.activeAgendaId).not.toBe(agendaId)
+  })
+
+  it('lets a confirmed natural-language decision create durable consequences', () => {
+    const game = generateNewCourt('natural-decision')
+    const agendaId = game.currentCourt.activeAgendaId
+    const agenda = game.currentCourt.agenda.find((item) => item.id === agendaId)
+    const presenterId = agenda?.presenterId ?? game.ministers[0].id
+    const beforeBureaucracy = game.metrics.bureaucracy
+    const next = recordCourtBeats(
+      game,
+      {
+        type: 'speak',
+        text: '对，就按这个办。',
+        targetMinisterId: presenterId,
+        agendaId,
+      },
+      [
+        {
+          speakerId: presenterId,
+          speakerName: game.ministers.find((minister) => minister.id === presenterId)?.publicDossier.name ?? '值殿官',
+          text: '臣领旨。',
+          atmosphere: '圣断既下，班列里立刻有人记下承办去处。',
+          clues: [],
+        },
+      ],
+      {
+        metricChanges: [],
+        edicts: [],
+        investigations: [],
+        memories: [],
+        standingChanges: [],
+        tentativeDecision: null,
+        agendaDecision: { agendaId, actionType: 'approve', ministerId: presenterId },
+      },
+    )
+
+    expect(next.edicts.at(-1)?.title).toContain('准办')
+    expect(next.metrics.bureaucracy).toBeGreaterThan(beforeBureaucracy)
+    expect(next.currentCourt.agenda.find((item) => item.id === agendaId)?.status).toBe('resolved')
+    expect(next.currentCourt.activeAgendaId).not.toBe(agendaId)
   })
 
   it('turns study investigations into verified evidence', () => {

@@ -172,8 +172,8 @@ svg {
 
 .minister-field {
   position: absolute;
-  inset: 108px 64px 142px;
-  z-index: 3;
+  inset: 104px 56px 118px;
+  z-index: 7;
   pointer-events: none;
 }
 
@@ -182,8 +182,8 @@ svg {
   left: var(--x);
   bottom: var(--y);
   z-index: var(--z);
-  width: clamp(96px, 7.4vw, 136px);
-  height: clamp(158px, 15.4vw, 238px);
+  width: clamp(82px, 6.2vw, 112px);
+  height: clamp(136px, 13vw, 198px);
   transform: translateX(-50%) scale(var(--scale));
   transform-origin: 50% 100%;
   border: 0;
@@ -274,7 +274,7 @@ svg {
   left: 50%;
   bottom: -8px;
   z-index: 3;
-  width: min(112px, 96%);
+  width: min(104px, 96%);
   min-height: 34px;
   transform: translateX(-50%);
   display: grid;
@@ -307,7 +307,7 @@ svg {
 
 .nameplate b {
   color: #ffe9b9;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .nameplate small {
@@ -318,7 +318,7 @@ svg {
 
 .minister-figure.selected .nameplate,
 .minister-figure.presenter .nameplate {
-  width: min(142px, 108%);
+  width: min(132px, 108%);
   min-height: 42px;
 }
 
@@ -353,10 +353,10 @@ svg {
 .throne-desk {
   position: absolute;
   left: 50%;
-  bottom: -6px;
-  z-index: 8;
-  width: min(900px, 70vw);
-  height: 184px;
+  bottom: -38px;
+  z-index: 6;
+  width: min(780px, 64vw);
+  height: 140px;
   transform: translateX(-50%);
   border: 1px solid rgba(255, 221, 146, 0.28);
   border-radius: 24px 24px 0 0;
@@ -369,9 +369,9 @@ svg {
 .desk-props {
   position: absolute;
   right: 32px;
-  bottom: 18px;
-  width: 360px;
-  height: 150px;
+  bottom: 22px;
+  width: 300px;
+  height: 118px;
   background: url('/assets/imperial/desk-props.png') center / contain no-repeat;
   opacity: 0.76;
   filter: drop-shadow(0 14px 18px rgba(0, 0, 0, 0.4));
@@ -380,8 +380,8 @@ svg {
 .desk-effects {
   position: absolute;
   left: 32px;
-  bottom: 32px;
-  width: min(430px, 46%);
+  bottom: 48px;
+  width: min(360px, 46%);
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
@@ -471,8 +471,8 @@ svg {
 .scene-dock {
   position: absolute;
   left: 50%;
-  bottom: 26px;
-  z-index: 16;
+  bottom: 18px;
+  z-index: 18;
   transform: translateX(-50%);
   gap: 8px;
   padding: 8px;
@@ -532,7 +532,7 @@ svg {
   z-index: 30;
   border: 1px solid rgba(244, 205, 128, 0.22);
   border-radius: 8px;
-  background: rgba(22, 13, 11, 0.9);
+  background: rgba(22, 13, 11, 0.84);
   box-shadow: 0 18px 52px rgba(0, 0, 0, 0.36);
   backdrop-filter: blur(18px);
 }
@@ -556,9 +556,9 @@ svg {
 
 .info-drawer.bottom {
   left: 50%;
-  bottom: 18px;
-  width: min(1040px, calc(100vw - 220px));
-  max-height: 40svh;
+  bottom: 96px;
+  width: min(1120px, calc(100vw - 120px));
+  max-height: 34svh;
   transform: translateX(-50%);
 }
 
@@ -801,6 +801,65 @@ svg {
   color: #aee7dd;
 }
 
+.court-dossier {
+  display: grid;
+  gap: 12px;
+}
+
+.court-dossier header {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 12px;
+  padding: 0 0 10px;
+  border-bottom: 1px solid rgba(244, 205, 128, 0.12);
+}
+
+.court-dossier header svg {
+  width: 36px;
+  height: 36px;
+  padding: 8px;
+  border: 1px solid rgba(87, 179, 162, 0.26);
+  border-radius: 7px;
+  color: #aee7dd;
+  background: rgba(20, 75, 70, 0.34);
+}
+
+.court-dossier header p {
+  margin: 4px 0 0;
+  color: #cbb68b;
+}
+
+.court-dossier-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.court-dossier-grid article,
+.pending-decision,
+.bottom-ledger > section {
+  border: 1px solid rgba(255, 225, 164, 0.14);
+  border-radius: 7px;
+  background: rgba(247, 225, 182, 0.07);
+}
+
+.court-dossier-grid article {
+  display: grid;
+  gap: 5px;
+  padding: 10px;
+}
+
+.court-dossier-grid b,
+.bottom-ledger h3,
+.pending-decision h3 {
+  color: #ffd98d;
+}
+
+.court-dossier-grid span {
+  color: #f3e2bf;
+  line-height: 1.55;
+}
+
 .ledger-list b,
 .dialogue-strip b {
   color: #ffd98d;
@@ -824,8 +883,72 @@ svg {
   cursor: pointer;
 }
 
+.dialogue-strip article p {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .dialogue-strip article.emperor {
   background: rgba(74, 140, 142, 0.16);
+}
+
+.bottom-ledger {
+  display: grid;
+  grid-template-columns: minmax(300px, 1.25fr) repeat(3, minmax(180px, 0.8fr));
+  gap: 10px;
+}
+
+.bottom-ledger > section {
+  min-height: 0;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding: 10px;
+}
+
+.bottom-ledger h3,
+.pending-decision h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.ledger-list.compact {
+  max-height: 170px;
+  overflow: auto;
+}
+
+.ledger-list.compact article {
+  display: grid;
+  gap: 4px;
+  padding: 8px;
+}
+
+.ledger-list.compact p {
+  margin: 0;
+  color: #ceb98f;
+}
+
+.pending-decision {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+}
+
+.pending-decision p {
+  flex: 1;
+  margin: 0;
+  color: #f3e2bf;
+}
+
+.pending-decision span {
+  padding: 4px 8px;
+  border-radius: 4px;
+  color: #190e0a;
+  background: #e2ad51;
 }
 
 .composer {
@@ -912,7 +1035,7 @@ svg {
   }
 
   .minister-field {
-    inset: 150px 18px 154px;
+    inset: 150px 18px 142px;
   }
 
   .minister-figure {
@@ -959,10 +1082,21 @@ svg {
 
   .info-drawer.bottom {
     width: calc(100vw - 36px);
+    bottom: 88px;
+  }
+
+  .court-scroll-wrap {
+    inset: 140px auto 122px 50%;
+    width: calc(100vw - 48px);
+  }
+
+  .bottom-ledger {
+    grid-template-columns: 1fr 1fr;
   }
 
   .throne-desk {
-    width: 86vw;
+    width: 76vw;
+    height: 118px;
   }
 }
 
@@ -1112,20 +1246,22 @@ svg {
 /* ===== 对话卷轴主舞台 ===== */
 
 .minister-field--bg {
-  opacity: 0.28;
+  opacity: 0.9;
   pointer-events: auto;
-  filter: blur(1px) saturate(0.7);
+  filter: saturate(0.9) brightness(0.94);
   transition: opacity 0.3s;
 }
 
 .minister-field--bg:hover {
-  opacity: 0.42;
+  opacity: 1;
 }
 
 .court-scroll-wrap {
   position: absolute;
-  inset: 88px 72px 0;
-  z-index: 8;
+  inset: 88px auto 128px 50%;
+  z-index: 9;
+  width: min(680px, calc(100vw - 520px));
+  transform: translateX(-50%);
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -1138,8 +1274,8 @@ svg {
   gap: 10px;
   padding: 8px 14px;
   border-radius: 8px 8px 0 0;
-  background: rgba(14, 8, 7, 0.72);
-  border: 1px solid rgba(244, 205, 128, 0.16);
+  background: rgba(14, 8, 7, 0.76);
+  border: 1px solid rgba(244, 205, 128, 0.18);
   border-bottom: none;
   pointer-events: none;
   flex-shrink: 0;
@@ -1172,9 +1308,10 @@ svg {
   overflow-y: auto;
   overflow-x: hidden;
   padding: 12px 10px;
-  background: rgba(10, 6, 5, 0.78);
-  border-left: 1px solid rgba(244, 205, 128, 0.14);
-  border-right: 1px solid rgba(244, 205, 128, 0.14);
+  background: linear-gradient(180deg, rgba(10, 6, 5, 0.78), rgba(10, 6, 5, 0.68));
+  border-left: 1px solid rgba(244, 205, 128, 0.16);
+  border-right: 1px solid rgba(244, 205, 128, 0.16);
+  backdrop-filter: blur(3px);
   pointer-events: auto;
   scroll-behavior: smooth;
   display: flex;
@@ -1312,7 +1449,7 @@ svg {
   flex-direction: column;
   gap: 0;
   border-radius: 0 0 8px 8px;
-  background: rgba(14, 8, 7, 0.88);
+  background: rgba(14, 8, 7, 0.86);
   border: 1px solid rgba(244, 205, 128, 0.16);
   border-top: 1px solid rgba(244, 205, 128, 0.1);
   pointer-events: auto;
@@ -1378,4 +1515,3 @@ svg {
   cursor: pointer;
   flex-shrink: 0;
 }
-

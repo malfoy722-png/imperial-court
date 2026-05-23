@@ -96,18 +96,18 @@ type MinisterStageSlot = {
 }
 
 const ministerPositions = [
-  { x: 39, y: 17, scale: 1.04, rank: 'front', side: 'left', z: 7 },
-  { x: 61, y: 17, scale: 1.04, rank: 'front', side: 'right', z: 7 },
-  { x: 31, y: 21, scale: 0.98, rank: 'front', side: 'left', z: 6 },
-  { x: 69, y: 21, scale: 0.98, rank: 'front', side: 'right', z: 6 },
-  { x: 46, y: 23, scale: 0.96, rank: 'front', side: 'left', z: 6 },
-  { x: 54, y: 23, scale: 0.96, rank: 'front', side: 'right', z: 6 },
-  { x: 36, y: 39, scale: 0.82, rank: 'back', side: 'left', z: 3 },
-  { x: 64, y: 39, scale: 0.82, rank: 'back', side: 'right', z: 3 },
-  { x: 27, y: 43, scale: 0.78, rank: 'back', side: 'left', z: 2 },
-  { x: 73, y: 43, scale: 0.78, rank: 'back', side: 'right', z: 2 },
-  { x: 44, y: 45, scale: 0.76, rank: 'back', side: 'left', z: 2 },
-  { x: 56, y: 45, scale: 0.76, rank: 'back', side: 'right', z: 2 },
+  { x: 11, y: 14, scale: 0.94, rank: 'front', side: 'left', z: 7 },
+  { x: 89, y: 14, scale: 0.94, rank: 'front', side: 'right', z: 7 },
+  { x: 20, y: 19, scale: 0.88, rank: 'front', side: 'left', z: 6 },
+  { x: 80, y: 19, scale: 0.88, rank: 'front', side: 'right', z: 6 },
+  { x: 29, y: 25, scale: 0.82, rank: 'front', side: 'left', z: 5 },
+  { x: 71, y: 25, scale: 0.82, rank: 'front', side: 'right', z: 5 },
+  { x: 15, y: 39, scale: 0.7, rank: 'back', side: 'left', z: 3 },
+  { x: 85, y: 39, scale: 0.7, rank: 'back', side: 'right', z: 3 },
+  { x: 24, y: 45, scale: 0.66, rank: 'back', side: 'left', z: 2 },
+  { x: 76, y: 45, scale: 0.66, rank: 'back', side: 'right', z: 2 },
+  { x: 7, y: 52, scale: 0.62, rank: 'back', side: 'left', z: 1 },
+  { x: 93, y: 52, scale: 0.62, rank: 'back', side: 'right', z: 1 },
 ] satisfies MinisterStageSlot[]
 
 type Drawer = 'left' | 'right' | 'bottom' | 'settings' | null
@@ -200,6 +200,21 @@ function speakerTargetFromLine(game: GameState, speakerId: string | null) {
   return speakerId ? game.ministers.find((minister) => minister.id === speakerId) ?? null : null
 }
 
+function actionLabel(type: CourtActionType) {
+  const labels: Partial<Record<CourtActionType, string>> = {
+    approve: '准奏',
+    reject: '驳回',
+    hold: '留中',
+    assign: '转办',
+    reconsider: '复议',
+    appoint: '任命',
+    speak: '问话',
+    summon: '点名',
+  }
+
+  return labels[type] ?? '候旨'
+}
+
 function MinisterFigure({
   minister,
   index,
@@ -218,8 +233,9 @@ function MinisterFigure({
   onSelect: (event: React.MouseEvent<HTMLButtonElement>) => void
 }) {
   const slot = ministerPositions[index % ministerPositions.length]
-  const portraitX = `${(index % 3) * 50}%`
-  const portraitY = `${Math.floor(index / 3) * 50}%`
+  const portraitIndex = index % 9
+  const portraitX = `${(portraitIndex % 3) * 50}%`
+  const portraitY = `${Math.floor(portraitIndex / 3) * 50}%`
 
   return (
     <button
@@ -265,8 +281,9 @@ function TranscriptBubble({
   isEmperor: boolean
   onClick: () => void
 }) {
-  const portraitX = `${(ministerIndex % 3) * 50}%`
-  const portraitY = `${Math.floor(ministerIndex / 3) * 50}%`
+  const portraitIndex = Math.max(0, ministerIndex) % 9
+  const portraitX = `${(portraitIndex % 3) * 50}%`
+  const portraitY = `${Math.floor(portraitIndex / 3) * 50}%`
 
   return (
     <div
@@ -614,7 +631,9 @@ function App() {
         setSelectedMinisterIds(nextAgenda?.status === 'open' ? [nextAgenda.presenterId] : [])
       }
       setComposer('')
-      setDrawer('bottom')
+      if (!primaryMinister) {
+        setDrawer('bottom')
+      }
     } finally {
       setBusy(false)
     }
@@ -668,7 +687,7 @@ function App() {
   const drawerTitle = drawer === 'left'
     ? '奏目与回合'
     : drawer === 'right'
-      ? '人事档案'
+      ? primaryMinister ? '人事档案' : '朝局档案'
       : drawer === 'bottom'
         ? '对话与旨意'
         : '模型设置'
@@ -710,12 +729,46 @@ function App() {
     </>
   )
 
+  const courtDossier = (
+    <section className="court-dossier">
+      <header>
+        <Landmark />
+        <div>
+          <h3>{currentAgenda?.title ?? '今日奏目'}</h3>
+          <p>{currentAgenda ? `${currentAgenda.status === 'open' ? '待裁' : currentAgenda.status === 'held' ? '留中' : '已决'} · ${currentAgenda.severity === 'crisis' ? '急务' : currentAgenda.severity === 'state' ? '政务' : '常务'}` : '无当前奏目'}</p>
+        </div>
+      </header>
+      {currentAgenda ? (
+        <div className="court-dossier-grid">
+          <article>
+            <b>主奏</b>
+            <span>{game.ministers.find((minister) => minister.id === currentAgenda.presenterId)?.publicDossier.office ?? '值殿官'}</span>
+          </article>
+          <article>
+            <b>所争</b>
+            <span>{currentAgenda.summary}</span>
+          </article>
+          <article>
+            <b>背景</b>
+            <span>{currentAgenda.briefing ?? '值房尚未补齐底账。'}</span>
+          </article>
+          <article>
+            <b>待断</b>
+            <span>{currentAgenda.decision ?? '请皇帝问明后裁断。'}</span>
+          </article>
+        </div>
+      ) : (
+        <p>今日奏目已有归处，可以整理情报或传下一回合。</p>
+      )}
+    </section>
+  )
+
   const rightDrawer = primaryMinister ? (
     <section className="minister-dossier">
       <header>
         <span className="portrait-mini" style={{
-          '--portrait-x': `${(game.ministers.indexOf(primaryMinister) % 3) * 50}%`,
-          '--portrait-y': `${Math.floor(game.ministers.indexOf(primaryMinister) / 3) * 50}%`,
+          '--portrait-x': `${((game.ministers.indexOf(primaryMinister) % 9) % 3) * 50}%`,
+          '--portrait-y': `${Math.floor((game.ministers.indexOf(primaryMinister) % 9) / 3) * 50}%`,
         } as React.CSSProperties} />
         <div>
           <h3>{primaryMinister.publicDossier.name}</h3>
@@ -746,11 +799,11 @@ function App() {
       </div>
       <dl>
         <div><dt>性情</dt><dd>{primaryMinister.persona.temperament}</dd></div>
-        <div><dt>所求</dt><dd>{primaryMinister.persona.desire}</dd></div>
-        <div><dt>所惧</dt><dd>{primaryMinister.persona.fear}</dd></div>
-        <div><dt>底线</dt><dd>{primaryMinister.persona.bottomLine}</dd></div>
-        <div><dt>派系</dt><dd>{primaryMinister.persona.faction}</dd></div>
+        <div><dt>风评</dt><dd>{primaryMinister.publicDossier.reputation}</dd></div>
+        <div><dt>神色</dt><dd>{primaryMinister.publicDossier.visibleMood}</dd></div>
+        <div><dt>站队</dt><dd>{primaryMinister.persona.faction}</dd></div>
         <div><dt>近况</dt><dd>{primaryMinister.standing.lastImperialSignal}</dd></div>
+        <div><dt>差事</dt><dd>{primaryMinister.standing.assignment ?? '暂无专差'}</dd></div>
       </dl>
       <div className="ledger-list">
         {primaryMinister.revealedFacts.length === 0 ? <p>底牌未明。</p> : null}
@@ -763,14 +816,81 @@ function App() {
       </div>
     </section>
   ) : (
-    <section className="minister-dossier empty">
-      <UsersRound />
-      <h3>未点臣子</h3>
-      <p>空选时，皇帝的话落给满朝。按住 Shift 可点选多名大臣议事。</p>
-    </section>
+    courtDossier
   )
 
-  const bottomDrawer = null
+  const recentLines = game.currentCourt.transcript.slice(-8).reverse()
+  const bottomDrawer = (
+    <div className="bottom-ledger">
+      <section>
+        <h3>近朝对话</h3>
+        <div className="dialogue-strip">
+          {recentLines.map((entry) => (
+            <article
+              key={entry.id}
+              className={entry.speakerName === '朕' ? 'emperor' : ''}
+              onClick={() => {
+                const target = speakerTargetFromLine(game, entry.speakerId)
+                if (target) {
+                  selectMinister(target.id, false)
+                  setDrawer('right')
+                } else {
+                  setSelectedMinisterIds([])
+                  setDrawer('right')
+                }
+              }}
+            >
+              <b>{entry.speakerName}</b>
+              <p>{entry.text}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+      <section>
+        <h3>旨意</h3>
+        <div className="ledger-list compact">
+          {game.edicts.length === 0 ? <p>朱笔未落。</p> : game.edicts.slice(-4).reverse().map((edict) => (
+            <article key={edict.id}>
+              <b>{edict.title}</b>
+              <span>{edict.summary}</span>
+            </article>
+          ))}
+        </div>
+      </section>
+      <section>
+        <h3>密报</h3>
+        <div className="ledger-list compact">
+          {game.investigations.length === 0 ? <p>尚无密查结果。</p> : game.investigations.slice(-4).reverse().map((item) => {
+            const minister = game.ministers.find((entry) => entry.id === item.ministerId)
+            return (
+              <article key={item.id}>
+                <b>{minister?.publicDossier.name ?? '某臣'}</b>
+                <span>{item.result}</span>
+              </article>
+            )
+          })}
+        </div>
+      </section>
+      <section>
+        <h3>朝录</h3>
+        <div className="ledger-list compact">
+          {game.summaries.length === 0 ? <p>退朝后生成。</p> : game.summaries.slice(0, 3).map((summary) => (
+            <article key={summary.id}>
+              <b>{summary.title}</b>
+              <span>{summary.summary}</span>
+            </article>
+          ))}
+        </div>
+      </section>
+      {game.currentCourt.tentativeDecision ? (
+        <section className="pending-decision">
+          <h3>待确认</h3>
+          <p>{game.currentCourt.tentativeDecision.confirmText}</p>
+          <span>{actionLabel(game.currentCourt.tentativeDecision.actionType)}</span>
+        </section>
+      ) : null}
+    </div>
+  )
 
   return (
     <main className={`court-app-v2 scene-${game.phase} drawer-${drawer ?? 'closed'}`}>
@@ -837,6 +957,9 @@ function App() {
                     const target = speakerTargetFromLine(game, entry.speakerId)
                     if (target) {
                       selectMinister(target.id, false)
+                      setDrawer('right')
+                    } else {
+                      setSelectedMinisterIds([])
                       setDrawer('right')
                     }
                   }}

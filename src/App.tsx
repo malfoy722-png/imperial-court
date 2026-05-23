@@ -481,7 +481,7 @@ function App() {
     const agenda = game.currentCourt.agenda.find((item) => item.id === agendaId)
     setGame((current) => ({
       ...current,
-      currentCourt: { ...current.currentCourt, activeAgendaId: agendaId },
+      currentCourt: { ...current.currentCourt, activeAgendaId: agendaId, tentativeDecision: null },
     }))
     setSelectedMinisterIds(agenda?.presenterId ? [agenda.presenterId] : [])
   }
@@ -608,7 +608,8 @@ function App() {
 
       setSource(nextSource)
       commitGame(next, next.currentCourt.atmosphere)
-      if (isAgendaDecision(type)) {
+      // 原按钮路径 或 AI agendaDecision 路径，都需要切换焦点到下一议题主奏人
+      if (isAgendaDecision(type) || next.currentCourt.activeAgendaId !== game.currentCourt.activeAgendaId) {
         const nextAgenda = activeAgenda(next)
         setSelectedMinisterIds(nextAgenda?.status === 'open' ? [nextAgenda.presenterId] : [])
       }

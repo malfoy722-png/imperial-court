@@ -1172,14 +1172,26 @@ export function recordCourtBeats(
   patch: StatePatch,
 ): GameState {
   const settledBeats = beats.slice(0, 4)
-  const effectivePatch = preparePatchForAction(game, action, patch)
+  // agendaDecision 路径：用实际决断类型替代 speak 计算 standing 信号
+  const agendaAction: PlayerAction = patch.agendaDecision
+    ? {
+        type: patch.agendaDecision.actionType,
+        text: action.text,
+        agendaId: patch.agendaDecision.agendaId,
+        targetMinisterId: patch.agendaDecision.ministerId,
+      }
+    : action
+  const effectivePatch = preparePatchForAction(game, agendaAction, patch)
   const next = applyStatePatch(
     game,
     action,
     effectivePatch,
     settledBeats.flatMap((beat) => beat.clues),
   )
-  const agenda = setAgendaStatus(next.currentCourt.agenda, action)
+  // agendaDecision 路径：applyStatePatch 已结算议题，直接用其结果；否则走原 setAgendaStatus
+  const agenda = effectivePatch.agendaDecision
+    ? next.currentCourt.agenda
+    : setAgendaStatus(next.currentCourt.agenda, action)
   const actionLabels: Record<string, string> = {
     summon: '点名奏对',
     approve: '准奏',
@@ -1209,8 +1221,8 @@ export function recordCourtBeats(
     ),
   )
 
-  const agendaTransition = isAgendaDecision(action)
-    ? nextOpenAgenda(agenda, action.agendaId ?? next.currentCourt.activeAgendaId)
+  const agendaTransition = isAgendaDecision(agendaAction)
+    ? nextOpenAgenda(agenda, agendaAction.agendaId ?? next.currentCourt.activeAgendaId)
     : null
   const playerLine = {
     ...line(`${next.id}-line-${lineBase}`, null, '朕', playerText, action.type),
@@ -1238,7 +1250,7 @@ export function recordCourtBeats(
     currentCourt: {
       ...next.currentCourt,
       agenda,
-      activeAgendaId: agendaTransition?.id ?? next.currentCourt.activeAgendaId,
+      activeAgendaId: agendaTransition?.id ?? (effectivePatch.agendaDecision ? '' : next.currentCourt.activeAgendaId),
       round: next.currentCourt.round + 1,
       focusMinisterId: agendaTransition?.presenterId ?? latestBeat?.speakerId ?? next.currentCourt.focusMinisterId,
       imperialEffects,
